@@ -56,6 +56,10 @@ function relatedFiles(file, files) {
   return [...ids].map((id) => files.find((f) => f.id === id)).filter(Boolean);
 }
 
+function isDirectlyRelated(a, b) {
+  return (a.relationIds || []).includes(b.id) || (b.relationIds || []).includes(a.id);
+}
+
 function RelationMap({ file, files, onNavigate }) {
   const related = relatedFiles(file, files);
   if (related.length === 0) {
@@ -66,35 +70,55 @@ function RelationMap({ file, files, onNavigate }) {
   const c = size / 2;
   const orbit = related.length <= 3 ? 80 : 100;
 
+  const nodes = related.map((r, i) => {
+    const angle = (i / related.length) * Math.PI * 2 - Math.PI / 2;
+    return { ...r, x: c + orbit * Math.cos(angle), y: c + orbit * Math.sin(angle) };
+  });
+
+  const satelliteLinks = [];
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      if (isDirectlyRelated(nodes[i], nodes[j])) {
+        satelliteLinks.push([nodes[i], nodes[j]]);
+      }
+    }
+  }
+
   return (
     <svg width="100%" viewBox={`0 0 ${size} ${size}`} style={{ display: 'block' }}>
-      {related.map((r, i) => {
-        const angle = (i / related.length) * Math.PI * 2 - Math.PI / 2;
-        const x = c + orbit * Math.cos(angle);
-        const y = c + orbit * Math.sin(angle);
-        return <line key={`line-${r.id}`} x1={c} y1={c} x2={x} y2={y} stroke="var(--line)" strokeWidth="1" />;
-      })}
+      {nodes.map((n) => (
+        <line key={`spoke-${n.id}`} x1={c} y1={c} x2={n.x} y2={n.y} stroke="var(--line)" strokeWidth="1" />
+      ))}
+      {satelliteLinks.map(([a, b]) => (
+        <line
+          key={`link-${a.id}-${b.id}`}
+          x1={a.x}
+          y1={a.y}
+          x2={b.x}
+          y2={b.y}
+          stroke="var(--cyan-dim)"
+          strokeWidth="1"
+          strokeDasharray="3 3"
+        />
+      ))}
       <circle cx={c} cy={c} r="9" fill="var(--bg-panel)" stroke="var(--cyan)" strokeWidth="2" />
       <text x={c} y={c + 24} textAnchor="middle" fill="var(--cyan)" fontFamily="IBM Plex Mono, monospace" fontSize="10">
         {file.name}
       </text>
-      {related.map((r, i) => {
-        const angle = (i / related.length) * Math.PI * 2 - Math.PI / 2;
-        const x = c + orbit * Math.cos(angle);
-        const y = c + orbit * Math.sin(angle);
-        const lvl = LEVELS[r.threat] || LEVELS.low;
+      {nodes.map((n) => {
+        const lvl = LEVELS[n.threat] || LEVELS.low;
         return (
-          <g key={r.id} style={{ cursor: 'pointer' }} onClick={() => onNavigate(r.id)}>
-            <circle cx={x} cy={y} r="7" fill="var(--bg-panel)" stroke={lvl.color} strokeWidth="2" />
+          <g key={n.id} style={{ cursor: 'pointer' }} onClick={() => onNavigate(n.id)}>
+            <circle cx={n.x} cy={n.y} r="7" fill="var(--bg-panel)" stroke={lvl.color} strokeWidth="2" />
             <text
-              x={x}
-              y={y + (y > c ? 20 : -14)}
+              x={n.x}
+              y={n.y + (n.y > c ? 20 : -14)}
               textAnchor="middle"
               fill="var(--text-dim)"
               fontFamily="IBM Plex Mono, monospace"
               fontSize="9.5"
             >
-              {r.name}
+              {n.name}
             </text>
           </g>
         );
