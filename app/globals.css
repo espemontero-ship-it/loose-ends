@@ -361,6 +361,36 @@ textarea { resize: vertical; min-height: 70px; }
 }
 .primary-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+.relnet {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border: 1px solid var(--line);
+  background: var(--bg-panel);
+}
+.relnet svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.relnode {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  background: var(--bg-panel);
+  border: 1px solid var(--text-dim);
+  border-radius: 2px;
+  padding: 4px 9px;
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  z-index: 1;
+  cursor: pointer;
+}
+.relnode.active {
+  border-color: var(--cyan);
+  background: #0d1f1f;
+  color: var(--text);
+  font-weight: 600;
+  cursor: default;
+}
+
 .relation-list {
   margin-top: 12px;
   border-top: 1px solid var(--line);
