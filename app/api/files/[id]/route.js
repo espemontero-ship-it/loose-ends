@@ -1,6 +1,7 @@
 import { query } from '../../../../lib/db.cjs';
 
 const THREAT_LEVELS = ['high', 'watch', 'low'];
+const TYPES = ['guest', 'staff'];
 
 function sanitizeRelations(input) {
   if (!Array.isArray(input)) return [];
@@ -14,6 +15,7 @@ export async function PATCH(request, { params }) {
   const body = await request.json();
   const name = (body.name || '').trim();
   const loggedBy = (body.loggedBy || '').trim();
+  const type = TYPES.includes(body.type) ? body.type : 'guest';
   const threat = THREAT_LEVELS.includes(body.threat) ? body.threat : 'low';
   const basicInfo = body.basicInfo || '';
   const secrets = body.secrets || '';
@@ -24,10 +26,10 @@ export async function PATCH(request, { params }) {
   }
 
   const { rows } = await query(
-    `UPDATE files SET name = $1, threat = $2, basic_info = $3, secrets = $4, relations = $5, logged_by = $6, updated_at = now()
-     WHERE id = $7
-     RETURNING id, name, threat, basic_info AS "basicInfo", secrets, relations, logged_by, updated_at`,
-    [name, threat, basicInfo, secrets, JSON.stringify(relations), loggedBy, id]
+    `UPDATE files SET name = $1, type = $2, threat = $3, basic_info = $4, secrets = $5, relations = $6, logged_by = $7, updated_at = now()
+     WHERE id = $8
+     RETURNING id, name, type, threat, basic_info AS "basicInfo", secrets, relations, logged_by, updated_at`,
+    [name, type, threat, basicInfo, secrets, JSON.stringify(relations), loggedBy, id]
   );
 
   if (rows.length === 0) {

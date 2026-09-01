@@ -65,6 +65,22 @@ function relationNote(a, b) {
   return (forward && forward.note) || (backward && backward.note) || '';
 }
 
+function allRelationPairs(files) {
+  const map = new Map();
+  files.forEach((f) => {
+    (f.relations || []).forEach((r) => {
+      const other = files.find((o) => o.id === r.id);
+      if (!other) return;
+      const key = [f.id, other.id].sort((x, y) => x - y).join('-');
+      if (!map.has(key) || (!map.get(key).note && r.note)) {
+        const [a, b] = f.id < other.id ? [f, other] : [other, f];
+        map.set(key, { a, b, note: r.note || relationNote(f, other) });
+      }
+    });
+  });
+  return [...map.values()];
+}
+
 function RelationMap({ file, files, onNavigate }) {
   const related = relatedFiles(file, files);
   if (related.length === 0) {
@@ -124,15 +140,45 @@ function RelationMap({ file, files, onNavigate }) {
           const note = relationNote(a, b);
           return (
             <div key={`${a.id}-${b.id}`} className="relation-list-row">
-              <div>
-                {a.id === file.id ? <b>{a.name}</b> : a.name} — {b.id === file.id ? <b>{b.name}</b> : b.name}
-              </div>
-              {note && <div className="relation-list-note">{note}</div>}
+              {a.id === file.id ? <b>{a.name}</b> : a.name} — {b.id === file.id ? <b>{b.name}</b> : b.name}
+              {note && <span className="relation-list-note"> — {note}</span>}
             </div>
           );
         })}
       </div>
     </>
+  );
+}
+
+function AllRelationsScreen({ files, onBack, onNavigate }) {
+  const pairs = allRelationPairs(files);
+  return (
+    <div className="detail">
+      <button className="back-btn" onClick={onBack}>
+        ‹ back to files
+      </button>
+      <h1 style={{ fontSize: 20, marginBottom: 4 }}>All Relations</h1>
+      <div className="subhead" style={{ marginBottom: 16 }}>
+        <b>{pairs.length}</b> relations logged
+      </div>
+      {pairs.length === 0 ? (
+        <div className="detail-section-body empty">no relations logged yet</div>
+      ) : (
+        <div className="all-relations-list">
+          {pairs.map((p, i) => (
+            <div key={`${p.a.id}-${p.b.id}`} className="all-relations-row">
+              <span className="all-relations-index">{i + 1}.</span>
+              <span>
+                <span className="rel-link" onClick={() => onNavigate(p.a.id)}>{p.a.name}</span>
+                {' — '}
+                <span className="rel-link" onClick={() => onNavigate(p.b.id)}>{p.b.name}</span>
+                {p.note && <span className="relation-list-note"> — {p.note}</span>}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -142,7 +188,9 @@ export default function Page() {
   const [files, setFiles] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [query, setQuery] = useState('');
-  const [screen, setScreen] = useState('list'); // list | detail | form
+  const [threatFilter, setThreatFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [screen, setScreen] = useState('list'); // list | detail | form | allRelations
   const [activeId, setActiveId] = useState(null);
   const [editing, setEditing] = useState(null); // file being edited, or null for new
 
@@ -184,12 +232,14 @@ export default function Page() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return files;
     return files.filter((f) => {
+      if (threatFilter !== 'all' && f.threat !== threatFilter) return false;
+      if (typeFilter !== 'all' && (f.type || 'guest') !== typeFilter) return false;
+      if (!q) return true;
       const relNames = relatedFiles(f, files).map((r) => r.name).join(' ');
       return [f.name, f.basicInfo, f.secrets, relNames].some((v) => (v || '').toLowerCase().includes(q));
     });
-  }, [files, query]);
+  }, [files, query, threatFilter, typeFilter]);
 
   const active = files.find((f) => f.id === activeId);
 
@@ -259,6 +309,33 @@ export default function Page() {
                   onChange={(e) => setQuery(e.target.value)}
                 />
               </div>
+
+              <div className="filter-row">
+                {['all', 'high', 'watch', 'low'].map((lvl) => (
+                  <div
+                    key={lvl}
+                    className={`filter-chip ${threatFilter === lvl ? 'selected' : ''}`}
+                    onClick={() => setThreatFilter(lvl)}
+                  >
+                    {lvl}
+                  </div>
+                ))}
+              </div>
+              <div className="filter-row">
+                {['all', 'guest', 'staff'].map((t) => (
+                  <div
+                    key={t}
+                    className={`filter-chip ${typeFilter === t ? 'selected' : ''}`}
+                    onClick={() => setTypeFilter(t)}
+                  >
+                    {t}
+                  </div>
+                ))}
+              </div>
+
+              <button className="all-relations-btn" onClick={() => setScreen('allRelations')}>
+                view all relations
+              </button>
             </div>
 
             <div className="list">
@@ -279,7 +356,7 @@ export default function Page() {
                     <div className="panel-head">
                       <div>
                         <div className="panel-name">{f.name}</div>
-                        <div className="panel-id">FILE {String(f.id).padStart(2, '0')}</div>
+                        <div className="panel-id">FILE {String(f.id).padStart(2, '0')} · {(f.type || 'guest').toUpperCase()}</div>
                       </div>
                       <div className="gauge">
                         <div className="gauge-label">
@@ -329,6 +406,17 @@ export default function Page() {
           </>
         )}
 
+        {screen === 'allRelations' && (
+          <AllRelationsScreen
+            files={files}
+            onBack={() => setScreen('list')}
+            onNavigate={(id) => {
+              setActiveId(id);
+              setScreen('detail');
+            }}
+          />
+        )}
+
         {screen === 'detail' && active && (
           <div className="detail">
             <button className="back-btn" onClick={() => setScreen('list')}>
@@ -337,7 +425,7 @@ export default function Page() {
             <div className="detail-head">
               <div>
                 <div className="detail-name">{active.name}</div>
-                <div className="detail-id">FILE {String(active.id).padStart(2, '0')}</div>
+                <div className="detail-id">FILE {String(active.id).padStart(2, '0')} · {(active.type || 'guest').toUpperCase()}</div>
               </div>
               <div className="gauge">
                 <div className="gauge-label">
@@ -400,6 +488,7 @@ export default function Page() {
 
 function FileForm({ file, allFiles, loggedBy, onCancel, onSaved }) {
   const [name, setName] = useState(file?.name || '');
+  const [type, setType] = useState(file?.type || 'guest');
   const [threat, setThreat] = useState(file?.threat || 'low');
   const [basicInfo, setBasicInfo] = useState(file?.basicInfo || '');
   const [secrets, setSecrets] = useState(file?.secrets || '');
@@ -432,7 +521,7 @@ function FileForm({ file, allFiles, loggedBy, onCancel, onSaved }) {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, threat, basicInfo, secrets, relations, loggedBy }),
+        body: JSON.stringify({ name, type, threat, basicInfo, secrets, relations, loggedBy }),
       });
       if (!res.ok) throw new Error('save failed');
       const saved = await res.json();
@@ -453,6 +542,15 @@ function FileForm({ file, allFiles, loggedBy, onCancel, onSaved }) {
 
       <label>Name</label>
       <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="guest or staff name" />
+
+      <label>Type</label>
+      <div className="threat-select">
+        {['guest', 'staff'].map((t) => (
+          <div key={t} className={`threat-option ${type === t ? 'selected lvl-watch' : ''}`} onClick={() => setType(t)}>
+            {t}
+          </div>
+        ))}
+      </div>
 
       <label>Threat</label>
       <div className="threat-select">
