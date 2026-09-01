@@ -97,14 +97,26 @@ function RelationMap({ file, files, onNavigate }) {
           <line key={`spoke-${n.id}`} x1={c} y1={c} x2={n.x} y2={n.y} stroke="var(--cyan-dim)" strokeWidth="1" />
         ))}
         {satelliteLinks.map(([a, b]) => {
-          // bow the line outward a little so it never collapses onto a spoke
+          // bow the line outward a little so it never collapses onto a spoke,
+          // even when a and b sit directly opposite each other through the center
           const mx = (a.x + b.x) / 2;
           const my = (a.y + b.y) / 2;
-          const dx = mx - c;
-          const dy = my - c;
-          const dist = Math.hypot(dx, dy) || 1;
-          const bowX = mx + (dx / dist) * 14;
-          const bowY = my + (dy / dist) * 14;
+          const outDx = mx - c;
+          const outDy = my - c;
+          const outDist = Math.hypot(outDx, outDy);
+          let ux, uy;
+          if (outDist > 0.5) {
+            ux = outDx / outDist;
+            uy = outDy / outDist;
+          } else {
+            const vx = b.x - a.x;
+            const vy = b.y - a.y;
+            const vLen = Math.hypot(vx, vy) || 1;
+            ux = -vy / vLen;
+            uy = vx / vLen;
+          }
+          const bowX = mx + ux * 16;
+          const bowY = my + uy * 16;
           return (
             <path
               key={`link-${a.id}-${b.id}`}
