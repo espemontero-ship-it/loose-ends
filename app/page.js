@@ -490,9 +490,20 @@ export default function Page() {
 
         {screen === 'detail' && active && (
           <div className="detail">
-            <button className="back-btn" onClick={() => setScreen('list')}>
-              ‹ back to files
-            </button>
+            <div className="detail-top-row">
+              <button className="back-btn" onClick={() => setScreen('list')}>
+                ‹ back to files
+              </button>
+              <button
+                className="edit-btn-top"
+                onClick={() => {
+                  setEditing(active);
+                  setScreen('form');
+                }}
+              >
+                edit
+              </button>
+            </div>
             {active.photoUrl && <img src={`/api/photo/${active.id}`} alt="" className="detail-photo" />}
             <div className="detail-head">
               <div>
@@ -528,15 +539,6 @@ export default function Page() {
               </div>
               <div>{timeAgo(active.updated_at)}</div>
             </div>
-            <button
-              className="edit-btn"
-              onClick={() => {
-                setEditing(active);
-                setScreen('form');
-              }}
-            >
-              edit this file
-            </button>
           </div>
         )}
 

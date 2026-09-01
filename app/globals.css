@@ -314,18 +314,24 @@ h1 {
 .detail-section-body { font-size: 14.5px; line-height: 1.6; color: var(--text-dim); white-space: pre-wrap; }
 .detail-section-body.empty { color: var(--text-faint); font-style: italic; }
 
-.edit-btn {
-  display: flex; align-items: center; gap: 8px;
-  width: 100%; justify-content: center;
+.detail-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.detail-top-row .back-btn {
+  margin-bottom: 0;
+}
+.edit-btn-top {
   background: var(--bg-panel);
   border: 1px solid var(--cyan-dim);
   color: var(--cyan);
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11.5px;
+  font-size: 10.5px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  padding: 12px;
-  margin-top: 8px;
+  padding: 6px 14px;
   cursor: pointer;
 }
 
