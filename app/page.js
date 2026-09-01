@@ -68,7 +68,7 @@ function RelationMap({ file, files, onNavigate }) {
 
   const size = 280;
   const c = size / 2;
-  const orbit = related.length <= 3 ? 80 : 100;
+  const orbit = related.length <= 3 ? 90 : 110;
 
   const nodes = related.map((r, i) => {
     const angle = (i / related.length) * Math.PI * 2 - Math.PI / 2;
@@ -84,46 +84,68 @@ function RelationMap({ file, files, onNavigate }) {
     }
   }
 
+  // list every line shown, in plain words, so it can be read, not just seen
+  const readableLines = [
+    ...nodes.map((n) => `${file.name} — ${n.name}`),
+    ...satelliteLinks.map(([a, b]) => `${a.name} — ${b.name}`),
+  ];
+
   return (
-    <svg width="100%" viewBox={`0 0 ${size} ${size}`} style={{ display: 'block' }}>
-      {nodes.map((n) => (
-        <line key={`spoke-${n.id}`} x1={c} y1={c} x2={n.x} y2={n.y} stroke="var(--line)" strokeWidth="1" />
-      ))}
-      {satelliteLinks.map(([a, b]) => (
-        <line
-          key={`link-${a.id}-${b.id}`}
-          x1={a.x}
-          y1={a.y}
-          x2={b.x}
-          y2={b.y}
-          stroke="var(--cyan-dim)"
-          strokeWidth="1"
-          strokeDasharray="3 3"
-        />
-      ))}
-      <circle cx={c} cy={c} r="9" fill="var(--bg-panel)" stroke="var(--cyan)" strokeWidth="2" />
-      <text x={c} y={c + 24} textAnchor="middle" fill="var(--cyan)" fontFamily="IBM Plex Mono, monospace" fontSize="10">
-        {file.name}
-      </text>
-      {nodes.map((n) => {
-        const lvl = LEVELS[n.threat] || LEVELS.low;
-        return (
-          <g key={n.id} style={{ cursor: 'pointer' }} onClick={() => onNavigate(n.id)}>
-            <circle cx={n.x} cy={n.y} r="7" fill="var(--bg-panel)" stroke={lvl.color} strokeWidth="2" />
-            <text
-              x={n.x}
-              y={n.y + (n.y > c ? 20 : -14)}
-              textAnchor="middle"
-              fill="var(--text-dim)"
-              fontFamily="IBM Plex Mono, monospace"
-              fontSize="9.5"
-            >
-              {n.name}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
+    <>
+      <svg width="100%" viewBox={`0 0 ${size} ${size}`} style={{ display: 'block' }}>
+        {nodes.map((n) => (
+          <line key={`spoke-${n.id}`} x1={c} y1={c} x2={n.x} y2={n.y} stroke="var(--cyan-dim)" strokeWidth="1" />
+        ))}
+        {satelliteLinks.map(([a, b]) => {
+          // bow the line outward a little so it never collapses onto a spoke
+          const mx = (a.x + b.x) / 2;
+          const my = (a.y + b.y) / 2;
+          const dx = mx - c;
+          const dy = my - c;
+          const dist = Math.hypot(dx, dy) || 1;
+          const bowX = mx + (dx / dist) * 14;
+          const bowY = my + (dy / dist) * 14;
+          return (
+            <path
+              key={`link-${a.id}-${b.id}`}
+              d={`M ${a.x} ${a.y} Q ${bowX} ${bowY} ${b.x} ${b.y}`}
+              fill="none"
+              stroke="var(--cyan-dim)"
+              strokeWidth="1"
+            />
+          );
+        })}
+        <circle cx={c} cy={c} r="9" fill="var(--bg-panel)" stroke="var(--cyan)" strokeWidth="2" />
+        <text x={c} y={c + 24} textAnchor="middle" fill="var(--cyan)" fontFamily="IBM Plex Mono, monospace" fontSize="10">
+          {file.name}
+        </text>
+        {nodes.map((n) => {
+          const lvl = LEVELS[n.threat] || LEVELS.low;
+          return (
+            <g key={n.id} style={{ cursor: 'pointer' }} onClick={() => onNavigate(n.id)}>
+              <circle cx={n.x} cy={n.y} r="7" fill="var(--bg-panel)" stroke={lvl.color} strokeWidth="2" />
+              <text
+                x={n.x}
+                y={n.y + (n.y > c ? 20 : -14)}
+                textAnchor="middle"
+                fill="var(--text-dim)"
+                fontFamily="IBM Plex Mono, monospace"
+                fontSize="9.5"
+              >
+                {n.name}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      <div className="relation-list">
+        {readableLines.map((line) => (
+          <div key={line} className="relation-list-row">
+            {line}
+          </div>
+        ))}
+      </div>
+    </>
   );
 }
 

@@ -361,6 +361,18 @@ textarea { resize: vertical; min-height: 70px; }
 }
 .primary-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+.relation-list {
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.relation-list-row {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--text-dim);
+  padding: 5px 0;
+}
+
 .relation-picker {
   display: flex;
   flex-wrap: wrap;
