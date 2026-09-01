@@ -47,17 +47,22 @@ function timeAgo(iso) {
 
 function relatedFiles(file, files) {
   if (!file) return [];
-  const outgoing = file.relationIds || [];
-  const ids = new Set(outgoing);
+  const ids = new Set((file.relations || []).map((r) => r.id));
   files.forEach((f) => {
-    if ((f.relationIds || []).includes(file.id)) ids.add(f.id);
+    if ((f.relations || []).some((r) => r.id === file.id)) ids.add(f.id);
   });
   ids.delete(file.id);
   return [...ids].map((id) => files.find((f) => f.id === id)).filter(Boolean);
 }
 
 function isDirectlyRelated(a, b) {
-  return (a.relationIds || []).includes(b.id) || (b.relationIds || []).includes(a.id);
+  return (a.relations || []).some((r) => r.id === b.id) || (b.relations || []).some((r) => r.id === a.id);
+}
+
+function relationNote(a, b) {
+  const forward = (a.relations || []).find((r) => r.id === b.id);
+  const backward = (b.relations || []).find((r) => r.id === a.id);
+  return (forward && forward.note) || (backward && backward.note) || '';
 }
 
 function RelationMap({ file, files, onNavigate }) {
@@ -115,11 +120,17 @@ function RelationMap({ file, files, onNavigate }) {
         ))}
       </div>
       <div className="relation-list">
-        {links.map(([a, b]) => (
-          <div key={`${a.id}-${b.id}`} className="relation-list-row">
-            {a.id === file.id ? <b>{a.name}</b> : a.name} — {b.id === file.id ? <b>{b.name}</b> : b.name}
-          </div>
-        ))}
+        {links.map(([a, b]) => {
+          const note = relationNote(a, b);
+          return (
+            <div key={`${a.id}-${b.id}`} className="relation-list-row">
+              <div>
+                {a.id === file.id ? <b>{a.name}</b> : a.name} — {b.id === file.id ? <b>{b.name}</b> : b.name}
+              </div>
+              {note && <div className="relation-list-note">{note}</div>}
+            </div>
+          );
+        })}
       </div>
     </>
   );
@@ -176,7 +187,7 @@ export default function Page() {
     if (!q) return files;
     return files.filter((f) => {
       const relNames = relatedFiles(f, files).map((r) => r.name).join(' ');
-      return [f.name, f.secrets, relNames].some((v) => (v || '').toLowerCase().includes(q));
+      return [f.name, f.basicInfo, f.secrets, relNames].some((v) => (v || '').toLowerCase().includes(q));
     });
   }, [files, query]);
 
@@ -279,6 +290,11 @@ export default function Page() {
                     </div>
                     <div className="field">
                       <div className="field-mark">›</div>
+                      <div className="field-label">Basic info</div>
+                      <div className={`field-value ${f.basicInfo ? '' : 'empty'}`}>{f.basicInfo || 'none logged'}</div>
+                    </div>
+                    <div className="field">
+                      <div className="field-mark">›</div>
                       <div className="field-label">Secrets</div>
                       <div className={`field-value ${f.secrets ? '' : 'empty'}`}>{f.secrets || 'none logged'}</div>
                     </div>
@@ -331,6 +347,10 @@ export default function Page() {
               </div>
             </div>
             <div className="detail-section">
+              <div className="detail-section-label">basic info</div>
+              <div className={`detail-section-body ${active.basicInfo ? '' : 'empty'}`}>{active.basicInfo || 'none logged'}</div>
+            </div>
+            <div className="detail-section">
               <div className="detail-section-label">secrets</div>
               <div className={`detail-section-body ${active.secrets ? '' : 'empty'}`}>{active.secrets || 'none logged'}</div>
             </div>
@@ -381,15 +401,22 @@ export default function Page() {
 function FileForm({ file, allFiles, loggedBy, onCancel, onSaved }) {
   const [name, setName] = useState(file?.name || '');
   const [threat, setThreat] = useState(file?.threat || 'low');
+  const [basicInfo, setBasicInfo] = useState(file?.basicInfo || '');
   const [secrets, setSecrets] = useState(file?.secrets || '');
-  const [relationIds, setRelationIds] = useState(file?.relationIds || []);
+  const [relations, setRelations] = useState(file?.relations || []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   const otherFiles = allFiles.filter((f) => f.id !== file?.id);
 
   function toggleRelation(id) {
-    setRelationIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    setRelations((prev) =>
+      prev.some((r) => r.id === id) ? prev.filter((r) => r.id !== id) : [...prev, { id, note: '' }]
+    );
+  }
+
+  function setRelationNote(id, note) {
+    setRelations((prev) => prev.map((r) => (r.id === id ? { ...r, note } : r)));
   }
 
   async function save() {
@@ -405,7 +432,7 @@ function FileForm({ file, allFiles, loggedBy, onCancel, onSaved }) {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, threat, secrets, relationIds, loggedBy }),
+        body: JSON.stringify({ name, threat, basicInfo, secrets, relations, loggedBy }),
       });
       if (!res.ok) throw new Error('save failed');
       const saved = await res.json();
@@ -440,6 +467,9 @@ function FileForm({ file, allFiles, loggedBy, onCancel, onSaved }) {
         ))}
       </div>
 
+      <label>Basic info</label>
+      <textarea value={basicInfo} onChange={(e) => setBasicInfo(e.target.value)} placeholder="who are they, where do they work?" />
+
       <label>Secrets</label>
       <textarea value={secrets} onChange={(e) => setSecrets(e.target.value)} placeholder="what do we know?" />
 
@@ -448,15 +478,28 @@ function FileForm({ file, allFiles, loggedBy, onCancel, onSaved }) {
         <div className="detail-section-body empty">no other files yet to connect to</div>
       ) : (
         <div className="relation-picker">
-          {otherFiles.map((f) => (
-            <div
-              key={f.id}
-              className={`relation-option ${relationIds.includes(f.id) ? 'selected' : ''}`}
-              onClick={() => toggleRelation(f.id)}
-            >
-              {f.name}
-            </div>
-          ))}
+          {otherFiles.map((f) => {
+            const rel = relations.find((r) => r.id === f.id);
+            return (
+              <div key={f.id} className="relation-pick-row">
+                <div
+                  className={`relation-option ${rel ? 'selected' : ''}`}
+                  onClick={() => toggleRelation(f.id)}
+                >
+                  {f.name}
+                </div>
+                {rel && (
+                  <input
+                    type="text"
+                    className="relation-note-input"
+                    placeholder="how are they related?"
+                    value={rel.note}
+                    onChange={(e) => setRelationNote(f.id, e.target.value)}
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
