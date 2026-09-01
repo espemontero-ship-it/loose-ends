@@ -45,6 +45,64 @@ function timeAgo(iso) {
   return `${days}d ago`;
 }
 
+function relatedFiles(file, files) {
+  if (!file) return [];
+  const outgoing = file.relationIds || [];
+  const ids = new Set(outgoing);
+  files.forEach((f) => {
+    if ((f.relationIds || []).includes(file.id)) ids.add(f.id);
+  });
+  ids.delete(file.id);
+  return [...ids].map((id) => files.find((f) => f.id === id)).filter(Boolean);
+}
+
+function RelationMap({ file, files, onNavigate }) {
+  const related = relatedFiles(file, files);
+  if (related.length === 0) {
+    return <div className="detail-section-body empty">no relations mapped</div>;
+  }
+
+  const size = 280;
+  const c = size / 2;
+  const orbit = related.length <= 3 ? 80 : 100;
+
+  return (
+    <svg width="100%" viewBox={`0 0 ${size} ${size}`} style={{ display: 'block' }}>
+      {related.map((r, i) => {
+        const angle = (i / related.length) * Math.PI * 2 - Math.PI / 2;
+        const x = c + orbit * Math.cos(angle);
+        const y = c + orbit * Math.sin(angle);
+        return <line key={`line-${r.id}`} x1={c} y1={c} x2={x} y2={y} stroke="var(--line)" strokeWidth="1" />;
+      })}
+      <circle cx={c} cy={c} r="9" fill="var(--bg-panel)" stroke="var(--cyan)" strokeWidth="2" />
+      <text x={c} y={c + 24} textAnchor="middle" fill="var(--cyan)" fontFamily="IBM Plex Mono, monospace" fontSize="10">
+        {file.name}
+      </text>
+      {related.map((r, i) => {
+        const angle = (i / related.length) * Math.PI * 2 - Math.PI / 2;
+        const x = c + orbit * Math.cos(angle);
+        const y = c + orbit * Math.sin(angle);
+        const lvl = LEVELS[r.threat] || LEVELS.low;
+        return (
+          <g key={r.id} style={{ cursor: 'pointer' }} onClick={() => onNavigate(r.id)}>
+            <circle cx={x} cy={y} r="7" fill="var(--bg-panel)" stroke={lvl.color} strokeWidth="2" />
+            <text
+              x={x}
+              y={y + (y > c ? 20 : -14)}
+              textAnchor="middle"
+              fill="var(--text-dim)"
+              fontFamily="IBM Plex Mono, monospace"
+              fontSize="9.5"
+            >
+              {r.name}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 export default function Page() {
   const [name, setName] = useState(undefined); // undefined = not loaded yet
   const [nameInput, setNameInput] = useState('');
@@ -94,9 +152,10 @@ export default function Page() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return files;
-    return files.filter((f) =>
-      [f.name, f.secrets, f.relations].some((v) => (v || '').toLowerCase().includes(q))
-    );
+    return files.filter((f) => {
+      const relNames = relatedFiles(f, files).map((r) => r.name).join(' ');
+      return [f.name, f.secrets, relNames].some((v) => (v || '').toLowerCase().includes(q));
+    });
   }, [files, query]);
 
   const active = files.find((f) => f.id === activeId);
@@ -174,6 +233,7 @@ export default function Page() {
               {loaded && filtered.length === 0 && <div className="list-empty">no files match</div>}
               {filtered.map((f) => {
                 const lvl = LEVELS[f.threat] || LEVELS.low;
+                const relNames = relatedFiles(f, files).map((r) => r.name).join(' · ');
                 return (
                   <div
                     key={f.id}
@@ -203,7 +263,7 @@ export default function Page() {
                     <div className="field">
                       <div className="field-mark">›</div>
                       <div className="field-label">Relations</div>
-                      <div className={`field-value ${f.relations ? '' : 'empty'}`}>{f.relations || 'none logged'}</div>
+                      <div className={`field-value ${relNames ? '' : 'empty'}`}>{relNames || 'none logged'}</div>
                     </div>
                     <div className="panel-meta">
                       <div>
@@ -254,7 +314,11 @@ export default function Page() {
             </div>
             <div className="detail-section">
               <div className="detail-section-label">relations</div>
-              <div className={`detail-section-body ${active.relations ? '' : 'empty'}`}>{active.relations || 'none logged'}</div>
+              <RelationMap
+                file={active}
+                files={files}
+                onNavigate={(id) => setActiveId(id)}
+              />
             </div>
             <div className="panel-meta">
               <div>
@@ -277,6 +341,7 @@ export default function Page() {
         {screen === 'form' && (
           <FileForm
             file={editing}
+            allFiles={files}
             loggedBy={name}
             onCancel={() => setScreen(editing ? 'detail' : 'list')}
             onSaved={(saved) => {
@@ -291,13 +356,19 @@ export default function Page() {
   );
 }
 
-function FileForm({ file, loggedBy, onCancel, onSaved }) {
+function FileForm({ file, allFiles, loggedBy, onCancel, onSaved }) {
   const [name, setName] = useState(file?.name || '');
   const [threat, setThreat] = useState(file?.threat || 'low');
   const [secrets, setSecrets] = useState(file?.secrets || '');
-  const [relations, setRelations] = useState(file?.relations || '');
+  const [relationIds, setRelationIds] = useState(file?.relationIds || []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  const otherFiles = allFiles.filter((f) => f.id !== file?.id);
+
+  function toggleRelation(id) {
+    setRelationIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
 
   async function save() {
     if (!name.trim()) {
@@ -312,7 +383,7 @@ function FileForm({ file, loggedBy, onCancel, onSaved }) {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, threat, secrets, relations, loggedBy }),
+        body: JSON.stringify({ name, threat, secrets, relationIds, loggedBy }),
       });
       if (!res.ok) throw new Error('save failed');
       const saved = await res.json();
@@ -351,7 +422,21 @@ function FileForm({ file, loggedBy, onCancel, onSaved }) {
       <textarea value={secrets} onChange={(e) => setSecrets(e.target.value)} placeholder="what do we know?" />
 
       <label>Relations</label>
-      <textarea value={relations} onChange={(e) => setRelations(e.target.value)} placeholder="connections to other files" />
+      {otherFiles.length === 0 ? (
+        <div className="detail-section-body empty">no other files yet to connect to</div>
+      ) : (
+        <div className="relation-picker">
+          {otherFiles.map((f) => (
+            <div
+              key={f.id}
+              className={`relation-option ${relationIds.includes(f.id) ? 'selected' : ''}`}
+              onClick={() => toggleRelation(f.id)}
+            >
+              {f.name}
+            </div>
+          ))}
+        </div>
+      )}
 
       {error && <div className="error-text">{error}</div>}
 

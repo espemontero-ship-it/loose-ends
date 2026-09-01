@@ -361,6 +361,25 @@ textarea { resize: vertical; min-height: 70px; }
 }
 .primary-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+.relation-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.relation-option {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  color: var(--text-dim);
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  background: var(--bg-panel);
+}
+.relation-option.selected {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
 .error-text {
   color: var(--warn);
   font-family: "IBM Plex Mono", monospace;
