@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS files (
   name TEXT NOT NULL,
   type TEXT NOT NULL DEFAULT 'guest' CHECK (type IN ('guest', 'staff')),
   threat TEXT NOT NULL DEFAULT 'low' CHECK (threat IN ('high', 'watch', 'low')),
+  photo_url TEXT NOT NULL DEFAULT '',
   basic_info TEXT NOT NULL DEFAULT '',
   secrets TEXT NOT NULL DEFAULT '',
   relations JSONB NOT NULL DEFAULT '[]',

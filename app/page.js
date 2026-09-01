@@ -1,6 +1,32 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { uploadPresigned } from '@vercel/blob/client';
+
+const PHOTO_MAX_DIMENSION = 480;
+const PHOTO_QUALITY = 0.72;
+
+function resizeImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const scale = Math.min(1, PHOTO_MAX_DIMENSION / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('resize failed'))), 'image/jpeg', PHOTO_QUALITY);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('could not read image'));
+    };
+    img.src = objectUrl;
+  });
+}
 
 const LEVELS = {
   high: { label: 'high', color: 'var(--warn)', ratio: 0.9 },
@@ -396,9 +422,12 @@ export default function Page() {
                     }}
                   >
                     <div className="panel-head">
-                      <div>
-                        <div className="panel-name">{f.name}</div>
-                        <div className="panel-id">FILE {String(f.id).padStart(2, '0')} · {(f.type || 'guest').toUpperCase()}</div>
+                      <div className="panel-head-info">
+                        {f.photoUrl && <img src={f.photoUrl} alt="" className="panel-photo" />}
+                        <div>
+                          <div className="panel-name">{f.name}</div>
+                          <div className="panel-id">FILE {String(f.id).padStart(2, '0')} · {(f.type || 'guest').toUpperCase()}</div>
+                        </div>
                       </div>
                       <div className="gauge">
                         <div className="gauge-label">
@@ -464,6 +493,7 @@ export default function Page() {
             <button className="back-btn" onClick={() => setScreen('list')}>
               ‹ back to files
             </button>
+            {active.photoUrl && <img src={active.photoUrl} alt="" className="detail-photo" />}
             <div className="detail-head">
               <div>
                 <div className="detail-name">{active.name}</div>
@@ -532,6 +562,8 @@ function FileForm({ file, allFiles, loggedBy, onCancel, onSaved }) {
   const [name, setName] = useState(file?.name || '');
   const [type, setType] = useState(file?.type || 'guest');
   const [threat, setThreat] = useState(file?.threat || 'low');
+  const [photoUrl, setPhotoUrl] = useState(file?.photoUrl || '');
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [basicInfo, setBasicInfo] = useState(file?.basicInfo || '');
   const [secrets, setSecrets] = useState(file?.secrets || '');
   const [relations, setRelations] = useState(file?.relations || []);
@@ -539,6 +571,26 @@ function FileForm({ file, allFiles, loggedBy, onCancel, onSaved }) {
   const [error, setError] = useState('');
 
   const otherFiles = allFiles.filter((f) => f.id !== file?.id);
+
+  async function onPhotoChange(e) {
+    const picked = e.target.files[0];
+    e.target.value = '';
+    if (!picked) return;
+    setUploadingPhoto(true);
+    setError('');
+    try {
+      const resized = await resizeImage(picked);
+      const blob = await uploadPresigned(`photos/${Date.now()}.jpg`, resized, {
+        access: 'public',
+        handleUploadUrl: '/api/blob-upload',
+      });
+      setPhotoUrl(blob.url);
+    } catch (e) {
+      setError('could not upload photo — try again');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
 
   function toggleRelation(id) {
     setRelations((prev) =>
@@ -563,7 +615,7 @@ function FileForm({ file, allFiles, loggedBy, onCancel, onSaved }) {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, type, threat, basicInfo, secrets, relations, loggedBy }),
+        body: JSON.stringify({ name, type, threat, photoUrl, basicInfo, secrets, relations, loggedBy }),
       });
       if (!res.ok) throw new Error('save failed');
       const saved = await res.json();
@@ -584,6 +636,15 @@ function FileForm({ file, allFiles, loggedBy, onCancel, onSaved }) {
 
       <label>Name</label>
       <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="guest or staff name" />
+
+      <label>Photo</label>
+      <div className="photo-field">
+        {photoUrl && <img src={photoUrl} alt="" className="photo-preview" />}
+        <label className="photo-upload-btn">
+          {uploadingPhoto ? 'uploading…' : photoUrl ? 'replace photo' : 'add photo'}
+          <input type="file" accept="image/*" capture="environment" onChange={onPhotoChange} disabled={uploadingPhoto} hidden />
+        </label>
+      </div>
 
       <label>Type</label>
       <div className="threat-select">

@@ -17,6 +17,7 @@ export async function PATCH(request, { params }) {
   const loggedBy = (body.loggedBy || '').trim();
   const type = TYPES.includes(body.type) ? body.type : 'guest';
   const threat = THREAT_LEVELS.includes(body.threat) ? body.threat : 'low';
+  const photoUrl = body.photoUrl || '';
   const basicInfo = body.basicInfo || '';
   const secrets = body.secrets || '';
   const relations = sanitizeRelations(body.relations);
@@ -26,10 +27,10 @@ export async function PATCH(request, { params }) {
   }
 
   const { rows } = await query(
-    `UPDATE files SET name = $1, type = $2, threat = $3, basic_info = $4, secrets = $5, relations = $6, logged_by = $7, updated_at = now()
-     WHERE id = $8
-     RETURNING id, name, type, threat, basic_info AS "basicInfo", secrets, relations, logged_by, updated_at`,
-    [name, type, threat, basicInfo, secrets, JSON.stringify(relations), loggedBy, id]
+    `UPDATE files SET name = $1, type = $2, threat = $3, photo_url = $4, basic_info = $5, secrets = $6, relations = $7, logged_by = $8, updated_at = now()
+     WHERE id = $9
+     RETURNING id, name, type, threat, photo_url AS "photoUrl", basic_info AS "basicInfo", secrets, relations, logged_by, updated_at`,
+    [name, type, threat, photoUrl, basicInfo, secrets, JSON.stringify(relations), loggedBy, id]
   );
 
   if (rows.length === 0) {
