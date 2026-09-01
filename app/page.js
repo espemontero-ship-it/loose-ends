@@ -423,7 +423,7 @@ export default function Page() {
                   >
                     <div className="panel-head">
                       <div className="panel-head-info">
-                        {f.photoUrl && <img src={f.photoUrl} alt="" className="panel-photo" />}
+                        {f.photoUrl && <img src={`/api/photo/${f.id}`} alt="" className="panel-photo" />}
                         <div>
                           <div className="panel-name">{f.name}</div>
                           <div className="panel-id">FILE {String(f.id).padStart(2, '0')} · {(f.type || 'guest').toUpperCase()}</div>
@@ -493,7 +493,7 @@ export default function Page() {
             <button className="back-btn" onClick={() => setScreen('list')}>
               ‹ back to files
             </button>
-            {active.photoUrl && <img src={active.photoUrl} alt="" className="detail-photo" />}
+            {active.photoUrl && <img src={`/api/photo/${active.id}`} alt="" className="detail-photo" />}
             <div className="detail-head">
               <div>
                 <div className="detail-name">{active.name}</div>
@@ -563,6 +563,7 @@ function FileForm({ file, allFiles, loggedBy, onCancel, onSaved }) {
   const [type, setType] = useState(file?.type || 'guest');
   const [threat, setThreat] = useState(file?.threat || 'low');
   const [photoUrl, setPhotoUrl] = useState(file?.photoUrl || '');
+  const [photoPreview, setPhotoPreview] = useState(file?.photoUrl ? `/api/photo/${file.id}` : '');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [basicInfo, setBasicInfo] = useState(file?.basicInfo || '');
   const [secrets, setSecrets] = useState(file?.secrets || '');
@@ -580,6 +581,7 @@ function FileForm({ file, allFiles, loggedBy, onCancel, onSaved }) {
     setError('');
     try {
       const resized = await resizeImage(picked);
+      setPhotoPreview(URL.createObjectURL(resized));
       const blob = await uploadPresigned(`photos/${Date.now()}.jpg`, resized, {
         access: 'public',
         handleUploadUrl: '/api/blob-upload',
@@ -639,7 +641,7 @@ function FileForm({ file, allFiles, loggedBy, onCancel, onSaved }) {
 
       <label>Photo</label>
       <div className="photo-field">
-        {photoUrl && <img src={photoUrl} alt="" className="photo-preview" />}
+        {photoPreview && <img src={photoPreview} alt="" className="photo-preview" />}
         <label className="photo-upload-btn">
           {uploadingPhoto ? 'uploading…' : photoUrl ? 'replace photo' : 'add photo'}
           <input type="file" accept="image/*" capture="environment" onChange={onPhotoChange} disabled={uploadingPhoto} hidden />
