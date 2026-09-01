@@ -150,6 +150,47 @@ function RelationMap({ file, files, onNavigate }) {
   );
 }
 
+function GlobalRelationMap({ files, onNavigate }) {
+  if (files.length === 0) return null;
+  const size = 320;
+  const c = size / 2;
+  const orbit = files.length <= 6 ? 110 : 135;
+
+  const nodes = files.map((f, i) => {
+    const angle = (i / files.length) * Math.PI * 2 - Math.PI / 2;
+    return { ...f, x: c + orbit * Math.cos(angle), y: c + orbit * Math.sin(angle) };
+  });
+
+  const links = [];
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      if (isDirectlyRelated(nodes[i], nodes[j])) {
+        links.push([nodes[i], nodes[j]]);
+      }
+    }
+  }
+
+  return (
+    <div className="relnet relnet-global">
+      <svg viewBox={`0 0 ${size} ${size}`} preserveAspectRatio="none">
+        {links.map(([a, b]) => (
+          <line key={`link-${a.id}-${b.id}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="var(--cyan-dim)" strokeWidth="1" strokeOpacity="0.6" />
+        ))}
+      </svg>
+      {nodes.map((n) => (
+        <div
+          key={n.id}
+          className="relnode relnode-sm"
+          style={{ left: `${(n.x / size) * 100}%`, top: `${(n.y / size) * 100}%` }}
+          onClick={() => onNavigate(n.id)}
+        >
+          {n.name}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function AllRelationsScreen({ files, onBack, onNavigate }) {
   const pairs = allRelationPairs(files);
   return (
@@ -161,6 +202,7 @@ function AllRelationsScreen({ files, onBack, onNavigate }) {
       <div className="subhead" style={{ marginBottom: 16 }}>
         <b>{pairs.length}</b> relations logged
       </div>
+      <GlobalRelationMap files={files} onNavigate={onNavigate} />
       {pairs.length === 0 ? (
         <div className="detail-section-body empty">no relations logged yet</div>
       ) : (

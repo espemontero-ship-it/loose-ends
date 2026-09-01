@@ -383,6 +383,13 @@ textarea { resize: vertical; min-height: 70px; }
   z-index: 1;
   cursor: pointer;
 }
+.relnet-global {
+  margin-bottom: 18px;
+}
+.relnode-sm {
+  font-size: 9.5px;
+  padding: 3px 7px;
+}
 .relnode.active {
   border-color: var(--cyan);
   background: #0d1f1f;
